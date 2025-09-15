@@ -1,52 +1,81 @@
-# server_tls.py
-# Esempio didattico: server TLS minimal con tlslite-ng (solo per laboratorio)
-from tlslite.api import TLSConnection, parsePEMKey, X509CertChain
+from tlslite.api import TLSConnection, X509, X509CertChain
+from tlslite.utils.keyfactory import parsePEMKey
 import socket
+import sys
 
 HOST = "0.0.0.0"
 PORT = 4443
 
-# Carica certificato e chiave (PEM)
-# Genera self-signed con openssl se non li hai ancora
-CERT_PEM = "server.crt"   # file PEM con certificato
-KEY_PEM = "server.key"    # file PEM con chiave privata
+# Percorsi dei file PEM
+CERT_PEM = "server.crt"
+KEY_PEM = "server.key"
 
 def load_cert_chain(cert_pem):
-    with open(cert_pem, "rb") as f:
-        return X509CertChain.fromPEMBytes(f.read())
+    """Carica il certificato X.509 da un file PEM e lo converte in una catena."""
+    try:
+        # Apri il file in modalità binaria ('rb')
+        with open(cert_pem, "rb") as f:
+            cert_data = f.read()
+        cert = X509()
+        cert.parse(cert_data)
+        return X509CertChain([cert])
+    except Exception as e:
+        print(f"Errore nel caricamento del certificato: {e}")
+        sys.exit(1)
 
 def load_private_key(key_pem):
-    with open(key_pem, "rb") as f:
-        return parsePEMKey(f.read(), private=True)
-
-def handle_client(conn_sock, cert_chain, priv_key):
-    tls_conn = TLSConnection(conn_sock)
-    # Server-side handshake: accetta connessioni TLS 1.0/1.1/1.2 a scopo didattico
+    """Carica la chiave privata da un file PEM."""
     try:
-        tls_conn.connectionServer(certChain=cert_chain, privateKey=priv_key, reqCert=False)
-        print("[*] Handshake completato")
-        # Leggi un messaggio semplice (non HTTP, per semplicità)
-        data = tls_conn.read()
-        print("[*] Ricevuto (decrypted):", data)
-        tls_conn.write(b"OK dal server TLS\n")
+        with open(key_pem, "rb") as f:
+            return parsePEMKey(f.read(), private=True)
     except Exception as e:
-        print("Errore handshake/connessione:", e)
-    finally:
-        tls_conn.close()
+        print(f"Errore nel caricamento della chiave privata: {e}")
+        sys.exit(1)
 
 def main():
-    cert_chain = load_cert_chain(CERT_PEM)
-    priv_key = load_private_key(KEY_PEM)
+    """Avvia il server TLS e gestisce le connessioni dei client."""
+    try:
+        # Carica il certificato e la chiave privata
+        cert_chain = load_cert_chain(CERT_PEM)
+        priv_key = load_private_key(KEY_PEM)
 
-    s = socket.socket()
-    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    s.bind((HOST, PORT))
-    s.listen(5)
-    print(f"[+] Server TLS in ascolto su {HOST}:{PORT}")
-    while True:
-        cli, addr = s.accept()
-        print("[*] Connessione da", addr)
-        handle_client(cli, cert_chain, priv_key)
+        # Crea un socket standard
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        s.bind((HOST, PORT))
+        s.listen(5)
+        print(f"[+] Server TLS in ascolto su {HOST}:{PORT}")
+
+        while True:
+            # Accetta una connessione TCP standard
+            conn_sock, addr = s.accept()
+            print(f"[*] Connessione da {addr}")
+            
+            # Esegui l'handshake TLS
+            tls_conn = TLSConnection(conn_sock)
+            try:
+                tls_conn.handshakeServer(certChain=cert_chain, privateKey=priv_key)
+                print("[*] Handshake TLS completato")
+                
+                # Ricevi i dati in byte e li decodifica in una stringa
+                data = tls_conn.read()
+                print("[*] Ricevuto (decrypted):", data.decode())
+                
+                # Rispondi al client con un messaggio in byte
+                tls_conn.write(b"OK dal server TLS\n")
+            
+            except Exception as e:
+                print(f"Errore handshake/connessione: {e}")
+            
+            finally:
+                # Chiudi la connessione TLS
+                tls_conn.close()
+
+    except Exception as e:
+        print(f"Errore fatale del server: {e}")
+    finally:
+        if 's' in locals():
+            s.close()
 
 if __name__ == "__main__":
     main()

@@ -40,3 +40,38 @@ source ./venv/bin/activate
 pip install -r requirements.txt
 ```
 
+---
+
+## Note
+tlslite-ng consente di configurare quasi completamente un server TLS, però non ha parametri che mostrino direttamente la versione tls negoziata. Per quello usare Wireshark.  
+
+Il server tlslite-ng usa la negoziazione automatica, accetta TLS 1.0, 1.1 e 1.2, ma non 1.3 (per quello si dovrà per forza usare OpenSSL o altro). Inoltre è il client a far partire la negoziazione, non possiamo forzarlo dal server.
+
+Per usare wireshark su linux devi avviarlo con sudo, perché le interfacce su linux richiedono privilegi sudo. Poi selezionare local interface: lo.  
+Il filtro da applicare è tcp.port == 4443.  
+Il pacchetto Client Hello contiene la versione massima supportata dal client, mentre il Server Hello indica la versione TLS scelta dal server.
+Se apri il pkt Server Hello ed espandi i campi puoi vedere nella voce Version la versione TLS negoziata; in Cypher Suite invece la cipher suite scelta dal server tra quelle proposte dal client.
+Per vedere i certificati guarda il pkt Certificate.
+NB: su wireshark a prima vista ti dice che è TLS 1.3, ma devi leggere la versione dentro il Server Hello.
+
+Comandi openssl (non provati): 
+```
+openssl s_client -connect 127.0.0.1:4443
+
+openssl s_client -connect <IP_SERVER>:4443 -CAfile server.crt -tls1_2
+
+openssl s_server -accept 4443 -cert server.crt -key server.key
+
+openssl s_server -accept 4443 -cert server.crt -key server.key -tls1_2
+
+openssl s_server -accept 4443 -cert server.crt -key server.key -tls1_3
+
+openssl s_server -accept 4443 -cert server.crt -key server.key -tls1_2 -debug -msg
+
+openssl s_server -accept 4443 -cert server.crt -key server.key -tls1_2 -cipher ECDHE-RSA-AES128-GCM-SHA256
+
+openssl s_server -accept 4443 -cert server.crt -key server.key -tls1
+
+openssl s_client -connect 192.168.56.101:4443 -tls1_2 -CAfile server.crt
+```
+

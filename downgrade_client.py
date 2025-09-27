@@ -3,11 +3,11 @@ import subprocess
 server = "192.168.91.135:8080" # insert the attacker IP address
 
 def try_openssl(version_flag, fallback_protection=None):
-    cmd = ["/usr/local/ssl/bin/openssl", "s_client", "-connect", server, version_flag] # /usr/local/ssl-1.0.1j/bin/openssl
+    cmd = ["/usr/local/ssl-1.0.1j/bin/openssl", "s_client", "-connect", server, version_flag] 
     if fallback_protection:
         cmd.append(fallback_protection)
 
-    result = subprocess.run(
+    result = subprocess.run( # executes: /usr/local/ssl-1.0.1j/bin/openssl s_client -connect <server_ip> [-fallback_scsv]
         cmd,
         input=b"",
         capture_output=True,

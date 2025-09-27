@@ -1,160 +1,83 @@
-# Heartbleed attack
+# Heartbleed Attack
 
-## Introduzione
+## Introduction
 
-Un'altra vulnerabilità di cui vogliamo trattare è chiamata heartbleed. Questa vulnerabilità non è relativa a TLS in sé ma alla sua implementazione. Infatti TLS è un protocollo che definisce regole di implementazione, ma tali protocolli vengono implementati in vari modi. OpenSSL è un software open source parecchio utilizzo che da la sua implementazione di TLS.
-Il motivo di questa piccola parentesi sta nel fatto che anche se il protocollo TLS non ha falle, attori maligni possono comunque provare a sfruttare le vulnerabilità nella sua implementazione. Infatti Heartbleed fu un bug parecchio famoso che rese vulnerabili parecchi server.
-Inoltre in questo progetto abbiamo più volte preso in considerazione e usato OpenSSL per simulare e mostrare le vulnerabilità, per cui riteniamo importante aprire una piccola parentesi pure su questo aspetto della sicurezza.
+This vulnerability is not inherent to TLS itself but rather to its implementation. TLS is a protocol that defines rules for secure communication, but these rules can be implemented in various ways. OpenSSL is a widely used open-source software that provides its own implementation of TLS. The reason for this brief explanation is that even if the TLS protocol itself has no flaws, malicious actors can still exploit vulnerabilities in its implementation. In fact, Heartbleed was a highly publicized bug that made about 17% of public HTTPS servers (roughly half a million) vulnerable.
 
-Heartbleed è una vulnerabilità del heartbeat TLS in OpenSSL ≤1.0.1f in quanto il server deve supportare l'estensione TLS Heartbeat, che è una funzionalità in cui viene verificata se la connessione TLS sia ancora attiva senza fare un nuovo handshake.
-Permette a un attaccante di leggere fino a 64 KB di memoria del server senza autenticazione.
-E' stato patchato dalle versioni di OpenSSL >1.0.1g
-In pratica prevede che il client e il server si rimbalzino un pacchetto heartbeat.
-La vulnerabilità Heartbleed nasce quando il server risponde più dati di quelli ricevuti, leggendo memoria arbitraria, infatti In OpenSSL, il server non controllava che la lunghezza dichiarata fosse corretta rispetto ai dati reali inviati.
+In this project, we frequently used OpenSSL to simulate and demonstrate vulnerabilities, making it important to address this aspect as well.
 
-In OpenSSL ≤1.0.1f, l’estensione Heartbeat è abilitata di default, quindi basta semplicemente avviare il server.
+Heartbleed is a vulnerability in the Heartbeat implementation present by default in `OpenSSL ≤1.0.1f`. The TLS Heartbeat extension is a feature designed to verify that a TLS connection is still active without repeating the entire handshake process; it essentially functions as a keep-alive mechanism.
 
-TLS (Transport Layer Security) è lo standard, definito da RFC, che descrive come stabilire una connessione sicura (handshake, cifratura, autenticazione, ecc.).
-OpenSSL è solo una delle librerie che implementano TLS.
-Il bug stava nel codice di OpenSSL, non nella specifica TLS.
+Heartbeat messages are identified by the `ContentType` field, which has a value of `0x18` within the TLS message. The messages contain the following fields:
+- `HeartbeatMessageType` (1 byte: 1 = request sent by the client; 2 = response sent by the server)
+- `payload_length` (2 bytes max, indicating the length of the payload declared by the client)
+- `payload` (the actual data sent by the client, which is expected to match the declared length)
 
-L’estensione Heartbeat è definita nella RFC 6520 come un’estensione per TLS/DTLS che fornisce una meccanismo di keep-alive (cioè per verificare che il peer sia ancora attivo) senza dover rifare tutto il processo di handshake.
+Heartbeat Request/Response messages are exchanged after the handshake as separate TLS records. Each request can return up to 64 KB of memory.
 
-Funziona così:
-Client → Server: il client invia un messaggio con un payload e la sua dimensione.
-Server → Client: il server risponde ripetendo lo stesso payload ricevuto leggendo quel numero di byte indicato.
+The keep-alive mechanism works as follows:
+- **Client → Server:** the client sends a heartbeat message with a payload and its size.
+- **Server → Client:** the server responds with its own heartbeat message, echoing the same payload received by reading the number of bytes indicated.
 
-L’attaccante poteva quindi inviare un payload associato a una lunghezza maggiore di quanto stesse effettivamente inviando.
-Il server, fidandosi della lunghezza dichiarata, cerca di restituire tutti quei byte, ma visto che il client aveva mandato meno byte di quanti ne aveva il payload allora completava la risposta leggendo dalla sua memoria interno.
+The payload can be arbitrary random data and is not intended to carry meaningful information, its purpose is solely to keep the connection alive.
 
-Il messaggio Heartbeat (RFC 6520) ha formato semplice:
-- Prima di tutto viene riconosciuto dal ContentType TLS che ha valore 0x24.
-- il campo `HeartbeatMessageType` (1 byte,  `1` = request, `2` = response.)
-- Il campo `payload_length` (2 byte max ed è lunghezza del payload dichiarata dal client)
-- Il campo `payload` (dati effettivi inviati dal client, ci si aspetta che coincida con la lunghezza dichiarata)
-Il bug: OpenSSL non controllava se il valore di `payload_length` fosse maggiore della lunghezza reale dei dati inviati con payload. 
+An attacker could exploit this by sending a payload smaller than the declared length. The server, trusting the declared length, would attempt to return all the bytes, reading beyond the actual payload from its internal memory, potentially exposing keys, credentials, cookies, etc.
 
-Dimensione totale del Heartbeat message (payload + header): 1 (type) + 2 (payload_length) + payload_length
-
-Ogni richiesta può restituire fino a 64 KB di memoria.
-Ripetendo l’attacco, si possono raccogliere pezzi di memoria contenenti come chiavi, credenziali, cookie etc.
-
-Ha colpito una parte enorme di Internet: si stima che circa il 17% dei server HTTPS pubblici (circa mezzo milione) fosse vulnerabile al momento della scoperta.
-Heartbleed ha mostrato quanto un singolo bug in una libreria fondamentale possa mettere a rischio la sicurezza di gran parte di Internet.
-
-I messaggi Heartbeat sono di due tipi principali:
-HeartbeatRequest, mandato dal client;
-HeartbeatResponse, mandato dal server; 
-
-Il payload può essere semplicemente dati random arbitrari, ma non è usato per trasmettere dati significativi, solo per mantenere viva la connessione.
-
-E' stata risolta aggiornando OpenSSL a versioni successive o disabilitando l’estensione Heartbeat se non necessaria.
+This vulnerability was fixed in `OpenSSL 1.0.1g`, which disabled the Heartbeat extension by default.
 
 
-## Operazioni preliminari
+## Experiments
 
-Dato che OpenSSL 1.0.1 non è una versione disponibile di default nei sistemi moderni, ho optato per scaricarla dal sito ufficiale e compilarla. Di seguito riporto tutti i comandi necessari per installare correttamente questa versione di OpenSSL senza causare conflitto con la versione più recente installata di default nel sistema:
+For Heartbleed we can assume only one server and one malicious client (attacker).
 
+Start the OpenSSL server using version 1.0.1f:
 ```
-wget https://www.openssl.org/source/old/1.0.1/openssl-1.0.1f.tar.gz
-tar -xzf openssl-1.0.1f.tar.gz
-cd openssl-1.0.1f
-
-./config --prefix=/usr/local/ssl-1.0.1f
-make
-sudo make install_sw
+/usr/local/ssl-1.0.1f/bin/openssl s_server -accept 4433 -cert server.crt -key server.key -tlsextdebug -www
 ```
+Where `-tlsextdebug` displays the TLS extensions, including Heartbeat.
+The option `-www` makes the server behave like a simple HTTP server.
 
->Questo installerà OpenSSL 1.0.1f in `/usr/local/ssl-1.0.1f`, per cui per usarlo in modo safe senza avere incompatibilità basta richiamarlo con il path `/usr/local/ssl-1.0.1f/bin/openssl`.
-
-Per verificare la versione installata:
-```
-/usr/local/ssl-1.0.1f/bin/openssl version
-```
-
-Quindi crea i certificati self-signed per il server OpenSSL:
-```
-/usr/local/ssl-1.0.1f/bin/openssl req -x509 -newkey rsa:2048 -keyout server.key -out server.crt -days 365 -nodes -subj "/CN=heartbleed"
-```
-
-Avviare wireshark lato client:
+With the attacker first start Wireshark:
 ```
 sudo wireshark
 ```
-E impostare il filtro `tls` per filtrare solo i pacchetti TLS.
 
-## Esperimenti
-
-Per l'Heartbleed possiamo assumere solo un server e un client malevolo.
-
-Avviare il server OpenSSL usando la versione 1.0.1f:
+To check whether the server is vulnerable to Heartbleed we use nmap with the attacker:
 ```
-/usr/local/ssl-1.0.1f/bin/openssl s_server -accept <port> -cert server.crt -key server.key -tlsextdebug -www
+nmap -p 4433 --script ssl-heartbleed <ip_server> -v
 ```
-Dove `-tlsextdebug` mostra le estensioni TLS, incluso Heartbeat.
+The server will respond with output that confirms whether it is vulnerable or not.
 
-Per vedere se il server è vulnerabile all'heartbleed:
-```
-nmap -p <port> --script ssl-heartbleed <ip_server> -v
-```
-Il server risponderà con un output che confermerà se è vulnerabile o no.
+To demonstrate this vulnerability, we use a tool called Metasploit.  
+The choice of this tool in this case is due to its ability to communicate directly at a low level with the OpenSSL library, constructing valid Heartbeat packets for the server. Essentially, it performs very complex operations, including building TLS records while managing the entire framing (headers, versions, payload length, etc.).
+Metasploit also maintains consistency in sequence numbers, correctly handles IVs and encryption state, and preserves the context of the SSL session.
 
-Per mostrare questa vulnerabilità utilizziamo il tool chiamato Metasploit.
-La scelta di questo tool su questo caso ricade sul fatto che è un potente tool che comunica direttamente a basso livello con la libreria OpenSSL, costruendo pacchetti Heartbeat validi per il server. In pratica esegue operazioni molto complesse che comprendono la costruzione dei record TLS gestendo il framing nella sua interezza (headers, versioni, payload length etc.).
-Metasploit mantiene inoltre la coerenza negli sequence number, gestisce correttamente gli IV e lo stato di cifratura e preserva il contesto della sessione SSL, cioè segue esattamente il CVE-2014-0160.
-
-Avviare Metasploit:
+Start Metasploit:
 ```
 msfconsole
 ```
 
-Poi usare il modulo openssl_heartbleed e configurarlo con i parametri corretti:
+Then use the `openssl_heartbleed` module and configure it with the correct parameters:
 ```
 use auxiliary/scanner/ssl/openssl_heartbleed
 set RHOSTS <ip_server>
-set RPORT <port>
+set RPORT 4433
+set action KEYS
 set VERBOSE true
 ```
+The action `KEYS` configures Metasploit to retrieve the server's private key.
 
-Avviare lo scan ed exploit con:
+Start the scan and exploit with:
 ```
 run
 ```
 
-### Risultati
 
-Possiamo osservare i pacchetti heartbeat prima tenendo il server attivo e catturando i pacchetti mandati da nmap. Infatti normalmente il client non li può mandare, l'unico modo per inviarli in questo esperimento è usare tool come nmap, metasploit o altri tool a basso livello in grado di costruire pacchetti heartbeat e inviarli.
+### Results
 
-Dal log stdout del server OpenSSL, usando nmap, possiamo notare che il client sta indicando che supporta l'estensione Heartbeat e che può usarlo.
-Su Wireshark invece possiamo notare che dopo l'handshake (client hello e server hello) il client manda l'heartbeat request malforme, infatti chiede un payload length di 16384 byte ma manda un payload di 19 byte.
-Nell'heartbeat response possiamo invece vedere che oltre a ripetere il payload, restituisce anche altri dati.
-In questo caso non restituisce alcun elemento significativo o sensibile, ma nelle giuste condizione l'attacker potrebbe.
+From the nmap log we can read that it detects the Heartbleed vulnerability on the server.
 
-Analizzando invece cosa fa metasploit, dal log del server continuiamo a vedere che il client usa l'estensione heartbeat.
-Su wireshark possiamo vedere che il client manda l'heartbeat request con una length di 65535 byte. E il server risponde con un heartbeat response e diversi pkt separati chiamati encrypted heartbeat.
-Questo perché TLS impone un massimo di 164384 byte di plaintext record.
-Il messaggio heartbeat usa già 3 byte (1 di type e 2 di payload length), quindi il payload massimo è di 16381 byte.
-Questi dati vengono mandati nel primo messaggio heartbeat.
-Ma il client aveva chiesto 65535 byte, quindi il server vulnerabile cerca di soddisfare la request frammentando i dati in più record TLS.
-Tali dati vengono analizzati da metasploit e restituiti nella sua shell.
-Per mostare le potenzialità di questo attacco, metasploit di default fa uno scan generico di 65535 byte, ma impostanto metasploit, prima del `run`:
-```
-set action KEYS
-```
-Possiamo dire di recuperare le chiavi private del server dalla memoria, operazione che riesce a fare senza problemi.
+Analyzing what Metasploit does, in Wireshark we can see that the client sends the heartbeat request with a length of 65,535 bytes but actually sends a payload of 19 bytes. The server responds with a heartbeat response echoing the payload, it also returns the extra bytes that the server read from its memory and several separate messages called Encrypted Heartbeat. This happens because TLS imposes a maximum of 164,384 bytes for a plaintext record. The heartbeat message already uses 3 bytes (1 for type and 2 for payload length), so the maximum payload is 16,381 bytes. Those bytes are sent in the first heartbeat message. But the client requested 65,535 bytes, so the vulnerable server tries to satisfy the request by fragmenting the data across multiple TLS records. Metasploit analyzes those fragments and returns them in its shell. Since we set Metasploit to the `KEYS` action, we can observe in its shell that it successfully returned the server’s private key.
 
 
-
----
-
-## Note
-
-l ContentType per Heartbeat è `24` in decimale, cioè `0x18` in esadecimale.  
-Esempio: 18 03 02 00 10 significa che il content type è un Heartbeat, 03 02 è la versione TLS1.1 mentre 03 03 è TLS 1.2, infine 00 10 è la lunghezza del record in byte.
-Poi byte successivi sono il messaggio heartbeat, il cui schema è stato specificato precedentemente. 
-
-I messaggi Heartbeat reali (Request/Response) si scambiano dopo l'handshake, come record TLS separati.
-
-
-## Fonti
 

@@ -1,0 +1,44 @@
+services:
+  client:
+    environment:
+      - PYTHONUNBUFFERED=1 # NEED THIS TO OUTPUT SUBPROCESS AND MAIN PROCESS STDOUTS!!!
+    image: ubuntulatest_base_system:latest
+    hostname: client
+    networks:
+      netsec:
+        ipv4_address: 172.18.0.2
+    command: my-venv/bin/python3 /app/script.py
+
+  server:
+    environment:
+      - PYTHONUNBUFFERED=1
+    image: ubuntulatest_base_system:latest
+    ports:
+      - "443"
+    hostname: server
+    networks:
+      netsec:
+        ipv4_address: 172.18.0.3
+    command: my-venv/bin/python3 /app/script.py
+
+  attacker:
+    environment:
+      - PYTHONUNBUFFERED=1
+    image: ubuntulatest_base_system:latest
+    user: 0:0
+    privileged: true
+    hostname: attacker
+    networks:
+      netsec:
+        ipv4_address: 172.18.0.4
+    command: my-venv/bin/python3 /app/script.py
+# if you comment the following lines and the previous "networks" key and subkey, the container will be able to talk to the internet!!!!
+networks:
+  netsec:
+    driver: bridge
+    internal: true
+    ipam:
+      config:
+      - subnet: 172.18.0.0/16
+        gateway: 172.18.0.1
+    name: netsec

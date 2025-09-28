@@ -1,0 +1,8 @@
+Key points:
+
+1. Always recompute checksums and lengths inside packets, before forwarding them with NFQUEUE!!!
+2. TLS lite -ng prepends the IV to the ciphertext, and generates an IV per each TLS record
+3. TLS records are DIFFERENT w.r.t. TLS messages (TLS records have a 5 byte header with the version, TLS messages are like handshake messages and are contained INSIDE tls records!!!!)
+4. before taking bytes from a mangled packet, be sure to rebuild the entire packet (and re-extract the layer you want to transform into bytes), otherwise you'll have an old version of it!!!
+5. Something different from what's written in the RFC about block cipher encryption... the ciphertext is calculated starting from a plaintext NOT containing the IV! In fact, the IV is appended RIGHT BEFORE the ciphertext AFTER encryption and BEFORE sending out the message.
+6. this proof of concept doesn't work if you enable encrypt then MAC or extended master secret extensions!

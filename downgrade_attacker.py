@@ -2,6 +2,9 @@ import socket
 import struct
 import threading
 
+SERVER_IP = "192.168.91.139" # set the server IP address and the port
+SERVER_PORT = 4433 # set the server port
+
 def parse_clienthello_tls_version(data):
     if len(data) < 11: # useful to discard incorrect packets
         return False
@@ -82,5 +85,5 @@ if __name__ == "__main__":
         print("Invalid choice, using mode 1 by default.")
         choice = '1'
 
-    relay_server(choice, listen_port=8080, server_ip="192.168.91.139", server_port=4433) # set the server IP address and the port
+    relay_server(choice, listen_port=8080, server_ip=SERVER_IP, server_port=SERVER_PORT) 
     

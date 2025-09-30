@@ -1,9 +1,9 @@
 import subprocess
 
-server = "192.168.91.135:8080" # insert the attacker IP address
+SERVER = "192.168.91.135:8080" # insert the attacker IP address (leave the port 8080)
 
 def try_openssl(version_flag, fallback_protection=None):
-    cmd = ["/usr/local/ssl-1.0.1j/bin/openssl", "s_client", "-connect", server, version_flag] 
+    cmd = ["/usr/local/ssl-1.0.1j/bin/openssl", "s_client", "-connect", SERVER, version_flag] 
     if fallback_protection:
         cmd.append(fallback_protection)
 

@@ -78,6 +78,14 @@ Install Wireshark:
 sudo apt install wireshark
 ```
 
+Download Visual Studio Code downloading the '.deb' package from the original website: 
+`https://code.visualstudio.com/Download`.  
+Then install the software using the following command:
+```
+sudo apt install ./<vscode_installer.deb>
+```
+
+
 Install Metasploit running this command:
 ```
 curl https://raw.githubusercontent.com/rapid7/metasploit-omnibus/master/config/templates/metasploit-framework-wrappers/msfupdate.erb > msfinstall && \
@@ -88,6 +96,42 @@ curl https://raw.githubusercontent.com/rapid7/metasploit-omnibus/master/config/t
 Install the following modules useful to simulate the triple handshake attack:
 ```
 sudo apt-get install python3-pip libnfnetlink0 python3 python3-dev libnetfilter-queue1 libnetfilter-queue-dev dsniff net-tools iptables iputils-ping gcc
+```
+
+Since OpenSSL 1.0.1f is not available by default on modern systems, download it from the official website and compile it. Below are all the commands required to correctly install this version of OpenSSL without causing conflicts with the more recent version already installed by default on the system:
+```
+wget https://www.openssl.org/source/old/1.0.1/openssl-1.0.1f.tar.gz
+tar -xzf openssl-1.0.1f.tar.gz
+cd openssl-1.0.1f
+
+./config --prefix=/usr/local/ssl-1.0.1f
+make
+sudo make install_sw
+cd ..
+```
+This will install OpenSSL 1.0.1f in `/usr/local/ssl-1.0.1f`, so to use it safely without compatibility issues you just need to call it with the path `/usr/local/ssl-1.0.1f/bin/openssl`.
+
+To verify the installed version:
+```
+/usr/local/ssl-1.0.1f/bin/openssl version
+```
+
+Since OpenSSL 1.0.1j is not available by default on modern systems, download it from the official website and compile it:
+```
+wget https://www.openssl.org/source/old/1.0.1/openssl-1.0.1j.tar.gz
+tar -xzf openssl-1.0.1j.tar.gz
+cd openssl-1.0.1j
+
+./config --prefix=/usr/local/ssl-1.0.1j
+make
+sudo make install_sw
+cd ..
+```
+This will install OpenSSL 1.0.1j in `/usr/local/ssl-1.0.1j`, so to use it safely without compatibility issues you just need to call it with the path `/usr/local/ssl-1.0.1j/bin/openssl`. 
+
+To verify the installed version:
+```
+/usr/local/ssl-1.0.1j/bin/openssl version
 ```
 
 Download this repository manually on Github or using the following command:
@@ -140,42 +184,6 @@ or
 sudo ufw disable
 ```
 
-Since OpenSSL 1.0.1f is not available by default on modern systems, download it from the official website and compile it. Below are all the commands required to correctly install this version of OpenSSL without causing conflicts with the more recent version already installed by default on the system:
-```
-wget https://www.openssl.org/source/old/1.0.1/openssl-1.0.1f.tar.gz
-tar -xzf openssl-1.0.1f.tar.gz
-cd openssl-1.0.1f
-
-./config --prefix=/usr/local/ssl-1.0.1f
-make
-sudo make install_sw
-cd ..
-```
-This will install OpenSSL 1.0.1f in `/usr/local/ssl-1.0.1f`, so to use it safely without compatibility issues you just need to call it with the path `/usr/local/ssl-1.0.1f/bin/openssl`.
-
-To verify the installed version:
-```
-/usr/local/ssl-1.0.1f/bin/openssl version
-```
-
-Since OpenSSL 1.0.1j is not available by default on modern systems, download it from the official website and compile it:
-```
-wget https://www.openssl.org/source/old/1.0.1/openssl-1.0.1j.tar.gz
-tar -xzf openssl-1.0.1j.tar.gz
-cd openssl-1.0.1j
-
-./config --prefix=/usr/local/ssl-1.0.1j
-make
-sudo make install_sw
-cd ..
-```
-This will install OpenSSL 1.0.1j in `/usr/local/ssl-1.0.1j`, so to use it safely without compatibility issues you just need to call it with the path `/usr/local/ssl-1.0.1j/bin/openssl`. 
-
-To verify the installed version:
-```
-/usr/local/ssl-1.0.1j/bin/openssl version
-```
-
 Generation of early data to be used by the client:
 ```
 printf 'EARLY-DATA\n' > early.txt
@@ -196,7 +204,7 @@ For it to work, `script.py` expects the following hostnames for the client, serv
 The file is a single script and contains the logic to execute the correct code for each of the three hosts, so all three run the same file.
 If you need to change the VM's hostname use the following command:
 ```
-sudo hostnamectl set-hostname <nuovo-hostname>
+sudo hostnamectl set-hostname <new_hostname>
 ```
 Wireshark may need to be reconfigured, run the following commands:
 ```
@@ -217,12 +225,6 @@ source ./venv/bin/activate
 ```
 
 ## Notes
-
-To use Wireshark on Linux, you need to run it with `sudo` because network interfaces on Linux require root privileges:
-```
-sudo wireshark
-```
-Then select the network interface you want to use.
 
 TLS filters in Wireshark:
 - `tls` to filter only TLS traffic

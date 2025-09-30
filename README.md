@@ -68,6 +68,11 @@ Install nmap:
 sudo apt install nmap
 ```
 
+Install git:
+```
+sudo apt install git
+```
+
 Install Wireshark:
 ```
 sudo apt install wireshark
@@ -110,10 +115,16 @@ Command explaination:
 - -nodes: no passphrase.  
 - -subj "/CN=server-lab": set the certificate “Common Name”.  
 
+Change the permission to the following files:
+```
+chmod 777 script.py downgrade_attacker.py downgrade_client.py keygen_certificates.sh
+```
+
 We want also to generate the keys and certificates used by the libraries that carry out the triple handshake, in this case simply run this bash file:
 ```
 ./keygen_certificates.sh
 ```
+You will be asked to input some fields: just press enter.
 
 Create the virtual environment and install the requirements:
 ```
@@ -122,7 +133,7 @@ source ./venv/bin/activate
 pip install -r requirements.txt
 ```
 
-In order to use OpenSSL with your clients and server, you need to deactivate your firewall or add a rule to allow the traffic on port 4433/443:
+In order to use OpenSSL with your clients and server, you need to deactivate your firewall or add a rule to allow the traffic on port 4433/443 (for our example we prefer to disable it):
 ```
 sudo ufw allow 4433/tcp
 or
@@ -171,8 +182,16 @@ printf 'EARLY-DATA\n' > early.txt
 ```
 The content is not important; it is only meant to demonstrate data to be sent.
 
-In the `script.py` file, modify your IP addresses, port, and the interface used by the attacker.  
-When you run `script.py`, remember to run it in the same path where the certificates are located.
+At this point you can clone the Virtual Machine.  
+
+Start each VM e look at their IP addresses, interface and the gateway IP address using these commands:
+```
+ifconfig
+ip route
+```
+
+In the `script.py` file, modify for each VM your IP addresses, port, and the interface used by the attacker.  
+When you'll run `script.py`, remember to run it in the same path where the certificates are located.
 For it to work, `script.py` expects the following hostnames for the client, server, and attacker: respectively `client`, `server`, `attacker`.  
 The file is a single script and contains the logic to execute the correct code for each of the three hosts, so all three run the same file.
 If you need to change the VM's hostname use the following command:
@@ -184,14 +203,18 @@ Wireshark may need to be reconfigured, run the following commands:
 sudo usermod -aG wireshark $USER
 sudo dpkg-reconfigure wireshark-common
 ```
-Restart the system.
+Restart all your the VMs.
 
-At this point you can clone the Virtual Machine, start the client, server, and attacker VMs and follow the instructions related to the vulnerability written on each markdown file:
+Now you can start the client, server, and attacker VMs and follow the instructions related to the vulnerability written on each markdown file:
 - DowngradeAttack.md
 - EarlyDataAttack.md
 - HeartbleedAttack.md
 - TripleHandshakeAttack.md
 
+Remember to stay inside the virtual environment activated, otherwise you can always activate it with:
+```
+source ./venv/bin/activate
+```
 
 ## Notes
 

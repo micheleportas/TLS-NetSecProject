@@ -78,7 +78,7 @@ Install Wireshark:
 sudo apt install wireshark
 ```
 
-Download Visual Studio Code downloading the '.deb' package from the original website: 
+Download Visual Studio Code downloading the '.deb' package from the original website (optional): 
 `https://code.visualstudio.com/Download`.  
 Then install the software using the following command:
 ```
